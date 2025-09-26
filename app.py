@@ -1,4 +1,27 @@
 import streamlit as st
+import pandas as pd
+
+# 🔹 Path to your default Excel file
+DEFAULT_XLSX_PATH = "FREE GENSET LIST - AUTOMATION - 25 SEPT.xlsx"
+
+@st.cache_data
+def load_pricebook(file_like):
+    xls = pd.ExcelFile(file_like)
+    gensets_df  = pd.read_excel(xls, "GENSETS")
+    tanks_df    = pd.read_excel(xls, "FUEL TANKS")
+    breakers_df = pd.read_excel(xls, "BREAKERS")
+
+    # Clean column names
+    for df in (gensets_df, tanks_df, breakers_df):
+        df.columns = df.columns.str.strip()
+
+    return gensets_df, tanks_df, breakers_df
+
+# 🔹 Load the file automatically (no upload needed)
+gensets_df, tanks_df, breakers_df = load_pricebook(DEFAULT_XLSX_PATH)
+st.success("Using default bundled price list.")
+
+import streamlit as st
 
 # --- Simple Password Protection ---
 def check_password():
