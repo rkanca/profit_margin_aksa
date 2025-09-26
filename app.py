@@ -1,3 +1,34 @@
+import streamlit as st
+
+# --- Simple Password Protection ---
+def check_password():
+    def password_entered():
+        if st.session_state["password"] == "1907":
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # don’t store it
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # First run, show input
+        st.text_input("Password", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        # Wrong password
+        st.text_input("Password", type="password", on_change=password_entered, key="password")
+        st.error("🔒 Incorrect password")
+        return False
+    else:
+        return True
+
+# --- Your app content ---
+if check_password():
+    st.title("Profit Margin Summary App")
+    st.write("✅ Welcome, you are logged in!")
+    # put the rest of your app code here (UI, uploads, etc.)
+
+
+
 import os
 from io import BytesIO
 from pathlib import Path
