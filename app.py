@@ -184,17 +184,11 @@ def build_pdf(payload: dict) -> BytesIO:
 # ---------------------------
 # UI
 # ---------------------------
-uploaded = st.file_uploader("📂 Upload Excel (.xlsx)", type=["xlsx"])
 
-if not uploaded:
-    st.info("Upload the Excel file to begin.")
-    st.stop()
-
-# Read sheets
-xls = pd.ExcelFile(uploaded)
-gensets_df = pd.read_excel(xls, sheet_name="GENSETS")
-tanks_df   = pd.read_excel(xls, sheet_name="FUEL TANKS")
-breakers_df= pd.read_excel(xls, sheet_name="BREAKERS")
+# Always use the bundled file
+DEFAULT_XLSX_PATH = "FREE GENSET LIST - AUTOMATION - 25 SEPT.xlsx"
+gensets_df, tanks_df, breakers_df = load_pricebook(DEFAULT_XLSX_PATH)
+st.success("Using default bundled price list.")
 
 # Clean columns
 for df in (gensets_df, tanks_df, breakers_df):
