@@ -1,75 +1,4 @@
-import streamlit as st
-import os
-
-# --- Password Gate ---
-def _get_password():
-    pw = None
-    try:
-        pw = st.secrets.get("APP_PASSWORD", None)
-    except Exception:
-        pass
-    if not pw:
-        pw = os.getenv("APP_PASSWORD", None)
-    return pw
-
-def auth_gate():
-    expected = _get_password()
-
-    # 1) Require a password to be configured
-    if not expected:
-        st.error("🔒 App is locked. Admin must set APP_PASSWORD in Streamlit Cloud → Settings → Secrets.")
-        st.stop()
-
-    # 2) Already signed in
-    if st.session_state.get("pw_ok"):
-        with st.sidebar:
-            if st.button("Sign out"):
-                st.session_state["pw_ok"] = False
-                st.experimental_rerun()
-        return
-
-    # 3) Login form
-    with st.form("login", clear_on_submit=True):
-        pw = st.text_input("Password", type="password")
-        submitted = st.form_submit_button("Sign in", use_container_width=True)
-
-    if submitted:
-        if pw == expected:
-            st.session_state["pw_ok"] = True
-            st.experimental_rerun()
-        else:
-            st.error("Incorrect password")
-            st.stop()
-    else:
-        st.stop()
-
-# --- Run protection before showing anything else ---
-st.set_page_config(page_title="Profit Margin Summary App", layout="centered")
-auth_gate()
-
-import streamlit as st
-import pandas as pd
-
-# 🔹 Path to your default Excel file
-DEFAULT_XLSX_PATH = "FREE GENSET LIST - AUTOMATION - 25 SEPT.xlsx"
-
-@st.cache_data
-def load_pricebook(file_like):
-    xls = pd.ExcelFile(file_like)
-    gensets_df  = pd.read_excel(xls, "GENSETS")
-    tanks_df    = pd.read_excel(xls, "FUEL TANKS")
-    breakers_df = pd.read_excel(xls, "BREAKERS")
-
-    # Clean column names
-    for df in (gensets_df, tanks_df, breakers_df):
-        df.columns = df.columns.str.strip()
-
-    return gensets_df, tanks_df, breakers_df
-
-# 🔹 Load the file automatically (no upload needed)
-gensets_df, tanks_df, breakers_df = load_pricebook(DEFAULT_XLSX_PATH)
-st.success("Using default bundled price list.")
-
+# app.py — Profit Margin Summary App (strict password, no upload)
 
 import os
 from io import BytesIO
@@ -87,68 +16,76 @@ from reportlab.lib import colors
 # ---------------------------
 # Page config
 # ---------------------------
-st.set_page_config(page_title="Genset Price & Margin", layout="centered")
+st.set_page_config(page_title="Profit Margin Summary App", layout="centered")
 
 # ---------------------------
-# Auth (simple password)
+# Strict password protection
 # ---------------------------
-def _get_expected_password():
-    # Prefer Streamlit secrets; fall back to environment variable.
-    pw = st.secrets.get("APP_PASSWORD", None) if hasattr(st, "secrets") else None
+def _get_password():
+    pw = None
+    # Prefer Streamlit Cloud secrets; fallback to env var if you set it
+    try:
+        pw = st.secrets.get("APP_PASSWORD", None)
+    except Exception:
+        pass
     if not pw:
         pw = os.getenv("APP_PASSWORD", None)
     return pw
 
-def _auth_gate():
-    expected = _get_expected_password()
-    if "auth_ok" not in st.session_state:
-        st.session_state.auth_ok = False
+def auth_gate():
+    expected = _get_password()
 
-    if expected is None:
-        st.info("🔒 No password configured. Set **APP_PASSWORD** in Streamlit Cloud secrets or environment variables.")
-        # Allow access but show banner
-        st.session_state.auth_ok = True
-        return True
+    # Require a configured password
+    if not expected:
+        st.error("🔒 App is locked. Admin must set APP_PASSWORD in Streamlit Cloud → Settings → Secrets.")
+        st.stop()
 
-    if st.session_state.auth_ok:
-        # Already signed in
+    # Already signed in
+    if st.session_state.get("pw_ok"):
         with st.sidebar:
             if st.button("Sign out"):
-                st.session_state.auth_ok = False
-                st.experimental_rerun()
-        return True
+                st.session_state["pw_ok"] = False
+                st.rerun()
+        return  # allow app to continue
 
-    st.markdown("### 🔑 Enter Password")
-    pwd = st.text_input("Password", type="password")
-    if st.button("Sign in", type="primary"):
-        if pwd == expected:
-            st.session_state.auth_ok = True
-            st.success("Signed in.")
-            st.experimental_rerun()
+    # Login form (blocks app until correct)
+    with st.form("login", clear_on_submit=True):
+        pw = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Sign in", use_container_width=True)
+
+    if submitted:
+        if pw == expected:
+            st.session_state["pw_ok"] = True
+            st.rerun()
         else:
-            st.error("Incorrect password.")
-    st.stop()
+            st.error("Incorrect password")
+            st.stop()
+    else:
+        st.stop()
 
-_auth_gate()
-
-# ---------------------------
-# Branding header
-# ---------------------------
-logo_path = Path("assets/logo.png")
-cols = st.columns([1,2,1])
-with cols[1]:
-    if logo_path.exists():
-        st.image(str(logo_path), use_container_width=False, width=180)
-st.markdown("<h2 style='text-align:center;margin-top:0;'>💰 Genset Price & Margin Calculator</h2>", unsafe_allow_html=True)
-st.caption("Upload the Excel with sheets **GENSETS**, **FUEL TANKS**, **BREAKERS**.")
+# Run protection BEFORE loading anything else
+auth_gate()
 
 # ---------------------------
-# Helpers
+# Constants & loaders
 # ---------------------------
+DEFAULT_XLSX_PATH = "FREE GENSET LIST - AUTOMATION - 25 SEPT.xlsx"
+
+@st.cache_data
+def load_pricebook(path_or_filelike):
+    xls = pd.ExcelFile(path_or_filelike)
+    gensets_df  = pd.read_excel(xls, "GENSETS")
+    tanks_df    = pd.read_excel(xls, "FUEL TANKS")
+    breakers_df = pd.read_excel(xls, "BREAKERS")
+    # Clean column names
+    for df in (gensets_df, tanks_df, breakers_df):
+        df.columns = df.columns.str.strip()
+    return gensets_df, tanks_df, breakers_df
+
 def fmt_money(x):
     try:
         return f"${float(x):,.2f}"
-    except:
+    except Exception:
         return "$0.00"
 
 def build_pdf(payload: dict) -> BytesIO:
@@ -156,9 +93,12 @@ def build_pdf(payload: dict) -> BytesIO:
     doc = SimpleDocTemplate(buf)
 
     styles = getSampleStyleSheet()
-    header = ParagraphStyle('Header', fontSize=12, textColor=colors.red, alignment=TA_CENTER, spaceAfter=12)
-    title = ParagraphStyle('Title', fontSize=16, alignment=TA_CENTER, spaceAfter=20, fontName='Helvetica-Bold')
-    section = ParagraphStyle('Section', fontSize=13, spaceBefore=12, spaceAfter=6, fontName='Helvetica-Bold')
+    header = ParagraphStyle('Header', fontSize=12, textColor=colors.red,
+                            alignment=TA_CENTER, spaceAfter=12)
+    title = ParagraphStyle('Title', fontSize=16, alignment=TA_CENTER,
+                           spaceAfter=20, fontName='Helvetica-Bold')
+    section = ParagraphStyle('Section', fontSize=13, spaceBefore=12,
+                             spaceAfter=6, fontName='Helvetica-Bold')
     normal = styles['Normal']; normal.fontSize = 11; normal.leading = 14
 
     def P(text, style=normal): return Paragraph(text, style)
@@ -189,11 +129,12 @@ def build_pdf(payload: dict) -> BytesIO:
         P(f"Selling Price (Actual Cost + {payload['margin_pct']:.1f}%): {fmt_money(payload['price_actual'])}"),
         P(f"Selling Price (Avg Cost + {payload['margin_pct']:.1f}%): {fmt_money(payload['price_avg'])}"),
     ]
+
     if payload['sales_target'] and payload['sales_target'] > 0:
         story += [
             P("■ Sales Target", style=section),
             P(f"Sales Person Target Price: {fmt_money(payload['sales_target'])}"),
-            P(f"Calculated Margin: {payload['calc_margin']:.2f}%")
+            P(f"Calculated Margin: {payload['calc_margin']:.2f}%"),
         ]
 
     doc.build(story)
@@ -201,19 +142,30 @@ def build_pdf(payload: dict) -> BytesIO:
     return buf
 
 # ---------------------------
-# UI
+# Load bundled Excel (no upload)
 # ---------------------------
+try:
+    gensets_df, tanks_df, breakers_df = load_pricebook(DEFAULT_XLSX_PATH)
+    st.success("Using default bundled price list.")
+except FileNotFoundError:
+    st.error(f"Could not find '{DEFAULT_XLSX_PATH}'. Please add it to the repo root.")
+    st.stop()
 
-# Always use the bundled file
-DEFAULT_XLSX_PATH = "FREE GENSET LIST - AUTOMATION - 25 SEPT.xlsx"
-gensets_df, tanks_df, breakers_df = load_pricebook(DEFAULT_XLSX_PATH)
-st.success("Using default bundled price list.")
+# ---------------------------
+# Branding header (optional logo)
+# ---------------------------
+logo_path = Path("assets/logo.png")
+cols = st.columns([1, 2, 1])
+with cols[1]:
+    if logo_path.exists():
+        st.image(str(logo_path), use_container_width=False, width=180)
 
-# Clean columns
-for df in (gensets_df, tanks_df, breakers_df):
-    df.columns = df.columns.str.strip()
+st.markdown("<h2 style='text-align:center;margin-top:0;'>💰 Genset Price & Margin Calculator</h2>", unsafe_allow_html=True)
+st.caption("Use the bundled price list to compute selling prices & profit margins.")
 
-# KW ranges
+# ---------------------------
+# Build KW ranges & UI
+# ---------------------------
 gensets_df["KW"] = pd.to_numeric(gensets_df["KW"], errors="coerce")
 max_kw = float(gensets_df["KW"].max())
 bins = [0, 100, 250, 400, 1000, max_kw + 1]
@@ -284,9 +236,9 @@ if show and sn_display:
 
     total_actual = actual_cost + tank_cost + breaker_cost
     total_avg    = avg_cost + tank_cost + breaker_cost
-    m = margin_pct/100.0
-    price_actual = total_actual * (1+m)
-    price_avg    = total_avg * (1+m)
+    m = margin_pct / 100.0
+    price_actual = total_actual * (1 + m)
+    price_avg    = total_avg * (1 + m)
 
     calc_margin = None
     if sales_target and sales_target > 0:
@@ -346,3 +298,4 @@ if show and sn_display:
         mime="application/pdf",
         use_container_width=True
     )
+
