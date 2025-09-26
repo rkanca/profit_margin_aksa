@@ -69,7 +69,7 @@ auth_gate()
 # ---------------------------
 # Constants & loaders
 # ---------------------------
-DEFAULT_XLSX_PATH = "FREE GENSET LIST - AUTOMATION - 25 SEPT.xlsx"
+DEFAULT_XLSX_PATH = "FREE GENSET LIST - AUTOMATION - 25 Sept.xlsx"
 
 @st.cache_data
 def load_pricebook(path_or_filelike):
