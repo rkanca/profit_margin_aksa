@@ -1,4 +1,53 @@
 import streamlit as st
+import os
+
+# --- Password Gate ---
+def _get_password():
+    pw = None
+    try:
+        pw = st.secrets.get("APP_PASSWORD", None)
+    except Exception:
+        pass
+    if not pw:
+        pw = os.getenv("APP_PASSWORD", None)
+    return pw
+
+def auth_gate():
+    expected = _get_password()
+
+    # 1) Require a password to be configured
+    if not expected:
+        st.error("🔒 App is locked. Admin must set APP_PASSWORD in Streamlit Cloud → Settings → Secrets.")
+        st.stop()
+
+    # 2) Already signed in
+    if st.session_state.get("pw_ok"):
+        with st.sidebar:
+            if st.button("Sign out"):
+                st.session_state["pw_ok"] = False
+                st.experimental_rerun()
+        return
+
+    # 3) Login form
+    with st.form("login", clear_on_submit=True):
+        pw = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Sign in", use_container_width=True)
+
+    if submitted:
+        if pw == expected:
+            st.session_state["pw_ok"] = True
+            st.experimental_rerun()
+        else:
+            st.error("Incorrect password")
+            st.stop()
+    else:
+        st.stop()
+
+# --- Run protection before showing anything else ---
+st.set_page_config(page_title="Profit Margin Summary App", layout="centered")
+auth_gate()
+
+import streamlit as st
 import pandas as pd
 
 # 🔹 Path to your default Excel file
@@ -20,36 +69,6 @@ def load_pricebook(file_like):
 # 🔹 Load the file automatically (no upload needed)
 gensets_df, tanks_df, breakers_df = load_pricebook(DEFAULT_XLSX_PATH)
 st.success("Using default bundled price list.")
-
-import streamlit as st
-
-# --- Simple Password Protection ---
-def check_password():
-    def password_entered():
-        if st.session_state["password"] == "1907":
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # don’t store it
-        else:
-            st.session_state["password_correct"] = False
-
-    if "password_correct" not in st.session_state:
-        # First run, show input
-        st.text_input("Password", type="password", on_change=password_entered, key="password")
-        return False
-    elif not st.session_state["password_correct"]:
-        # Wrong password
-        st.text_input("Password", type="password", on_change=password_entered, key="password")
-        st.error("🔒 Incorrect password")
-        return False
-    else:
-        return True
-
-# --- Your app content ---
-if check_password():
-    st.title("Profit Margin Summary App")
-    st.write("✅ Welcome, you are logged in!")
-    # put the rest of your app code here (UI, uploads, etc.)
-
 
 
 import os
